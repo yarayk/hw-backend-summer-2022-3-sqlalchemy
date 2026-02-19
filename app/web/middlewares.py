@@ -4,6 +4,7 @@ import typing
 from aiohttp.web_exceptions import HTTPException, HTTPUnprocessableEntity
 from aiohttp.web_middlewares import middleware
 from aiohttp_apispec import validation_middleware
+from aiohttp_session import get_session
 
 from app.web.utils import error_json_response
 
@@ -20,6 +21,20 @@ HTTP_ERROR_CODES = {
     409: "conflict",
     500: "internal_server_error",
 }
+
+
+@middleware
+async def auth_middleware(request: "Request", handler):
+    session = await get_session(request)
+    admin_data = session.get("admin")
+    
+    if admin_data:
+        from app.admin.models import AdminModel
+        request.admin = AdminModel(id=admin_data["id"], email=admin_data["email"])
+    else:
+        request.admin = None
+    
+    return await handler(request)
 
 
 @middleware
@@ -51,3 +66,4 @@ async def error_handling_middleware(request: "Request", handler):
 def setup_middlewares(app: "Application"):
     app.middlewares.append(error_handling_middleware)
     app.middlewares.append(validation_middleware)
+    app.middlewares.append(auth_middleware)
